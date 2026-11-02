@@ -13,3 +13,9 @@ A battery level display shows in the top-left on Android phones and computers. i
 Photos and settings stay saved on your phone, inside the browser. Nothing gets uploaded anywhere. The page asks iOS for protected storage, remembers the last photo shown, and has **Backup / Restore** (one `.json` file you can save to the Files app).
 
 **Important:** Safari tabs and the Home Screen app keep *separate* storage. Add the page to your Home Screen first, then add your photos from there.
+
+## Google Calendar (tomorrow's events)
+
+Open ⚙️ → **📅 Google Calendar** and follow the steps there. In short: tap **Copy script**, paste it into a new project at script.google.com, deploy it as a **Web app** (Execute as: Me, Who has access: Anyone), then paste the `/exec` URL into the page and tap **Connect**.
+
+The script runs in your own Google account and only answers requests that include the secret key built into it. The page refreshes every 15 minutes and keeps the last events it got, so they still show if you're offline.

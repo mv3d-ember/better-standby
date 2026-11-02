@@ -166,6 +166,45 @@
   #battery .bolt { display: none; font-size: 16px; }
   #battery.charging .bolt { display: inline; }
 
+  /* ---------- tomorrow's events card ---------- */
+  #cal {
+    position: fixed; z-index: 2; display: none;
+    right: max(18px, env(safe-area-inset-right)); bottom: 9vh;
+    width: min(28vw, 300px); max-height: 76vh; overflow: hidden;
+    padding: 14px 16px; border-radius: 18px;
+    background: rgba(0,0,0,.42); border: 1px solid rgba(255,255,255,.12);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    pointer-events: none;
+  }
+  body.has-cal #cal { display: block; }
+  #cal h3 { margin: 0 0 8px; font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: .02em; text-transform: uppercase; }
+  #cal h3 small { color: #fff; opacity: .65; font-weight: 500; text-transform: none; letter-spacing: 0; }
+  .ev { display: flex; gap: 9px; padding: 5px 0; border-top: 1px solid rgba(255,255,255,.1); }
+  .ev:first-of-type { border-top: 0; }
+  .ev .dot { flex: none; width: 4px; border-radius: 2px; background: var(--accent); }
+  .ev .t { font-size: 13px; opacity: .75; font-variant-numeric: tabular-nums; }
+  .ev .n { font-size: 16px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: calc(min(28vw, 300px) - 50px); }
+  #cal .more, #cal .empty, #cal .err { font-size: 14px; opacity: .7; padding-top: 4px; }
+  /* make room for the card */
+  body.has-cal #time { font-size: min(17vw, 38vh); }
+  body.has-cal.no-photos #clock { left: max(5vw, env(safe-area-inset-left)); bottom: 9vh; transform: none; text-align: left; }
+
+  /* calendar setup in the menu */
+  details.steps { margin-top: 10px; background: rgba(255,255,255,.06); border-radius: 12px; padding: 10px 12px; }
+  details.steps summary { font-weight: 600; cursor: pointer; }
+  details.steps ol { margin: 10px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.45; }
+  details.steps li { margin-bottom: 6px; }
+  details.steps b { color: var(--accent); }
+  .text-in {
+    width: 100%; margin-top: 10px; padding: 11px 12px; border-radius: 10px; font-size: 15px;
+    border: 1px solid var(--panel-line); background: rgba(0,0,0,.35); color: #fff;
+    -webkit-user-select: text; user-select: text;
+  }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; font-size: 15px; margin-top: 4px; }
+  .toggle-row input { width: 24px; height: 24px; accent-color: var(--accent); }
+  #calStatus.ok { color: #7dff9a; opacity: 1; }
+  #calStatus.bad { color: #ff8a8a; opacity: 1; }
+
   /* portrait hint */
   #rotate {
     display: none; position: fixed; z-index: 15; left: 50%; top: max(20px, env(safe-area-inset-top));
@@ -179,6 +218,9 @@
     #date { font-size: 5vw; }
     #clock { bottom: 12vh; }
     #slides::after { background: linear-gradient(0deg, rgba(0,0,0,.7) 0%, rgba(0,0,0,0) 60%); }
+    #cal { top: 70px; bottom: auto; width: calc(100vw - 36px); max-height: 34vh; }
+    .ev .n { max-width: calc(100vw - 100px); }
+    body.has-cal #time { font-size: 24vw; }
   }
 </style>
 </head>
@@ -195,6 +237,11 @@
 <div id="battery" aria-label="Battery level">
   <div class="shell"><div class="fill"></div></div>
   <span class="pct">--%</span><span class="bolt">⚡</span>
+</div>
+
+<div id="cal" aria-label="Tomorrow's events">
+  <h3>Tomorrow <small id="calDay"></small></h3>
+  <div id="calList"></div>
 </div>
 
 <div id="tint"></div>
@@ -253,6 +300,30 @@
   </div>
 
   <div class="section">
+    <div class="label"><span>📅 Google Calendar</span></div>
+    <div class="toggle-row"><span>Show tomorrow’s events</span><input type="checkbox" id="calShow"></div>
+    <div class="note" id="calStatus">Not connected yet</div>
+    <details class="steps" id="calSteps">
+      <summary>How to connect (about 3 minutes)</summary>
+      <ol>
+        <li>Tap <b>Copy script</b> below.</li>
+        <li>Go to <b>script.google.com</b> (signed in to the Google account with your calendar) and tap <b>New project</b>.</li>
+        <li>Delete everything in the code box, paste the script, and tap 💾 <b>Save</b>.</li>
+        <li>Tap <b>Deploy → New deployment</b>. Click the ⚙️ next to “Select type” and choose <b>Web app</b>.</li>
+        <li>Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>, then tap <b>Deploy</b>.</li>
+        <li>Google asks for permission. Tap <b>Authorize access</b> and pick your account. If you see “Google hasn’t verified this app”, tap <b>Advanced → Go to (your project)</b>. That’s normal, because you made the app yourself.</li>
+        <li>Copy the <b>Web app URL</b> (it ends in <b>/exec</b>), paste it below, and tap <b>Connect</b>.</li>
+      </ol>
+      <button class="btn secondary" id="copyScriptBtn">Copy script</button>
+    </details>
+    <input class="text-in" id="calUrl" type="url" placeholder="Paste Web app URL (…/exec)" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="row">
+      <button class="btn" id="calConnectBtn">Connect</button>
+      <button class="btn secondary" id="calRefreshBtn">Refresh</button>
+    </div>
+  </div>
+
+  <div class="section">
     <div class="label"><span>💾 Saving</span></div>
     <div id="storageStatus">Checking…</div>
     <div class="note" id="storageNote"></div>
@@ -278,10 +349,14 @@
   const DEFAULTS = {
     brightness: 100, tint: null, tintStrength: 50,
     interval: 10, shuffle: true, hour: 12, accent: '#7cc4ff',
-    customTint: '#ff8800', lastId: null
+    customTint: '#ff8800', lastId: null,
+    calUrl: '', calKey: '', calShow: true
   };
   let S = { ...DEFAULTS };
   try { Object.assign(S, JSON.parse(localStorage.getItem('standby-settings') || '{}')); } catch (e) {}
+  if (!S.calKey) { // secret word so only this page can read your calendar
+    S.calKey = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, '0')).join('');
+  }
   const save = () => { try { localStorage.setItem('standby-settings', JSON.stringify(S)); } catch (e) {} };
 
   const TINTS = [
@@ -449,7 +524,7 @@
     if (S.tint) { t.style.background = S.tint; t.style.opacity = (S.tintStrength / 100).toFixed(2); }
     else t.style.opacity = 0;
     document.documentElement.style.setProperty('--accent', S.accent);
-    applyUI(); tick();
+    applyUI(); tick(); renderCal();
   }
   function applyUI() {
     $('brightness').value = S.brightness; $('brightVal').textContent = S.brightness + '%';
@@ -463,6 +538,8 @@
     document.querySelectorAll('#accentSwatches .swatch').forEach(b => b.classList.toggle('selected', b.dataset.c === S.accent));
     $('interval').value = S.interval; $('intervalVal').textContent = S.interval < 60 ? `${S.interval} s` : `${Math.floor(S.interval/60)} min${S.interval % 60 ? ' ' + S.interval % 60 + ' s' : ''}`;
     $('shuffleBtn').textContent = 'Shuffle: ' + (S.shuffle ? 'On' : 'Off');
+    $('calShow').checked = !!S.calShow;
+    if (document.activeElement !== $('calUrl')) $('calUrl').value = S.calUrl || '';
     document.querySelectorAll('#hourSeg button').forEach(b => b.classList.toggle('on', +b.dataset.v === S.hour));
   }
 
@@ -595,11 +672,147 @@
     }).catch(() => {});
   }
 
+  /* ================= Google Calendar (via your own Apps Script) ================= */
+  function scriptText() {
+    return [
+      '// Better Standby: sends tomorrow\'s events to your clock page.',
+      '// Only someone with this secret key can read them:',
+      "const KEY = '" + S.calKey + "';",
+      '',
+      'function doGet(e) {',
+      '  const p = e.parameter;',
+      "  if (p.key !== KEY) return send({ error: 'wrong key' });",
+      '  const start = new Date(Number(p.start));',
+      '  const end = new Date(Number(p.end));',
+      '  const events = [];',
+      '  CalendarApp.getAllCalendars().forEach(function (cal) {',
+      '    if (cal.isHidden() || !cal.isSelected()) return;',
+      '    cal.getEvents(start, end).forEach(function (ev) {',
+      '      events.push({',
+      '        title: ev.getTitle() || \'(No title)\',',
+      '        start: ev.getStartTime().getTime(),',
+      '        end: ev.getEndTime().getTime(),',
+      '        allDay: ev.isAllDayEvent(),',
+      '        color: cal.getColor()',
+      '      });',
+      '    });',
+      '  });',
+      '  return send({ events: events });',
+      '}',
+      '',
+      'function send(obj) {',
+      '  return ContentService.createTextOutput(JSON.stringify(obj))',
+      '    .setMimeType(ContentService.MimeType.JSON);',
+      '}',
+      ''
+    ].join('\n');
+  }
+
+  const dayKey = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  function tomorrowRange() {
+    const a = new Date(); a.setHours(0, 0, 0, 0); a.setDate(a.getDate() + 1);
+    const b = new Date(a); b.setDate(b.getDate() + 1);
+    return [a, b];
+  }
+  let cal = null; // { day, fetched, events, error }
+  try { cal = JSON.parse(localStorage.getItem('standby-cal') || 'null'); } catch (e) {}
+
+  function fmtTime(ms) {
+    const d = new Date(ms); let h = d.getHours(); const m = String(d.getMinutes()).padStart(2, '0');
+    if (S.hour === 24) return `${String(h).padStart(2, '0')}:${m}`;
+    const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return `${h}:${m} ${ap}`;
+  }
+  const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function renderCal() {
+    const on = !!(S.calShow && S.calUrl);
+    document.body.classList.toggle('has-cal', on);
+    if (!on) return;
+    const [tStart] = tomorrowRange();
+    $('calDay').textContent = '· ' + DAYS[tStart.getDay()];
+    const list = $('calList');
+    if (!cal || cal.day !== dayKey(tStart)) {
+      list.innerHTML = `<div class="empty">${cal && cal.error ? 'Can’t reach calendar' : 'Loading…'}</div>`;
+      return;
+    }
+    const evs = cal.events.slice().sort((a, b) => (b.allDay - a.allDay) || (a.start - b.start));
+    if (!evs.length) { list.innerHTML = '<div class="empty">Nothing planned 🎉</div>'; return; }
+    const draw = MAX => { list.innerHTML = evs.slice(0, MAX).map(ev => `
+      <div class="ev"><div class="dot" style="background:${esc(ev.color || '')}"></div>
+        <div><div class="t">${ev.allDay ? 'All day' : fmtTime(ev.start) + ' – ' + fmtTime(ev.end)}</div>
+        <div class="n">${esc(ev.title)}</div></div></div>`).join('')
+      + (evs.length > MAX ? `<div class="more">+${evs.length - MAX} more</div>` : '')
+      + (cal.error ? '<div class="err">Offline: showing saved events</div>' : ''); };
+    // show as many events as fit in the card, then "+N more"
+    const box = $('cal');
+    let max = evs.length; draw(max);
+    while (max > 1 && box.scrollHeight > box.clientHeight + 1) draw(--max);
+  }
+
+  function setCalStatus(text, cls) { const el = $('calStatus'); el.textContent = text; el.className = 'note ' + (cls || ''); }
+
+  async function fetchCal() {
+    if (!S.calUrl) { setCalStatus('Not connected yet'); renderCal(); return false; }
+    const [a, b] = tomorrowRange();
+    const url = `${S.calUrl}${S.calUrl.includes('?') ? '&' : '?'}key=${encodeURIComponent(S.calKey)}&start=${a.getTime()}&end=${b.getTime()}`;
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      const data = await r.json();
+      if (data.error === 'wrong key') throw new Error('The script has a different secret key. Copy the script again and update it.');
+      if (!Array.isArray(data.events)) throw new Error('Unexpected reply from the script.');
+      cal = { day: dayKey(a), fetched: Date.now(), events: data.events };
+      setCalStatus(`Connected ✓  (updated ${fmtTime(Date.now())})`, 'ok');
+      renderCal();
+      try { localStorage.setItem('standby-cal', JSON.stringify(cal)); } catch (e) {}
+      return true;
+    } catch (e) {
+      const msg = e instanceof SyntaxError || e instanceof TypeError
+        ? 'Couldn’t connect. Check the URL ends in /exec and access is set to “Anyone”.'
+        : e.message;
+      setCalStatus(msg, 'bad');
+      if (cal) cal.error = true;
+      renderCal();
+      return false;
+    }
+  }
+
+  $('copyScriptBtn').onclick = async () => {
+    const btn = $('copyScriptBtn');
+    try { await navigator.clipboard.writeText(scriptText()); btn.textContent = 'Copied ✓'; }
+    catch (e) { // fallback for older iOS
+      const ta = document.createElement('textarea'); ta.value = scriptText(); document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); ta.remove(); btn.textContent = 'Copied ✓';
+    }
+    setTimeout(() => btn.textContent = 'Copy script', 2500);
+  };
+  $('calConnectBtn').onclick = async () => {
+    const u = $('calUrl').value.trim();
+    if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(u)) {
+      setCalStatus('That doesn’t look like an Apps Script URL. It should start with https://script.google.com/', 'bad'); return;
+    }
+    S.calUrl = u; S.calShow = true; save(); applyUI();
+    setCalStatus('Connecting…'); cal = null; renderCal();
+    if (await fetchCal()) $('calSteps').open = false;
+  };
+  $('calRefreshBtn').onclick = () => { setCalStatus('Refreshing…'); fetchCal(); };
+  $('calShow').onchange = e => { S.calShow = e.target.checked; save(); renderCal(); };
+
+  // keep it fresh: every 15 minutes, when you come back to the page, and right after midnight
+  addEventListener('resize', () => renderCal()); // re-fit when the phone rotates
+  let lastDay = dayKey(new Date());
+  setInterval(() => {
+    const now = dayKey(new Date());
+    if (now !== lastDay) { lastDay = now; fetchCal(); }
+  }, 30 * 1000);
+  setInterval(fetchCal, 15 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fetchCal(); });
+
   /* ================= start ================= */
   buildSwatches();
   apply();
   loadAlbum();
   protectStorage();
+  if (S.calUrl) fetchCal(); else $('calSteps').open = true;
 })();
 </script>
 </body>
