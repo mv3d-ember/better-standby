@@ -144,6 +144,28 @@
   #storageStatus.ok { color: #7dff9a; }
   #progress { font-size: 14px; color: var(--accent); margin-top: 8px; min-height: 1em; }
 
+  /* ---------- battery ---------- */
+  #battery {
+    position: fixed; z-index: 3; display: none; align-items: center; gap: 8px;
+    top: max(18px, env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left));
+    font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 8px rgba(0,0,0,.6); pointer-events: none;
+  }
+  #battery.show { display: flex; }
+  #battery .shell {
+    position: relative; width: 38px; height: 19px; border: 2px solid rgba(255,255,255,.85);
+    border-radius: 5px; padding: 2px;
+  }
+  #battery .shell::after {
+    content: ""; position: absolute; right: -6px; top: 5px; width: 3px; height: 6px;
+    background: rgba(255,255,255,.85); border-radius: 0 2px 2px 0;
+  }
+  #battery .fill { height: 100%; border-radius: 2px; background: #fff; transition: width .5s, background .5s; }
+  #battery.charging .fill { background: #4cd964; }
+  #battery.low .fill { background: #ff3b30; }
+  #battery .bolt { display: none; font-size: 16px; }
+  #battery.charging .bolt { display: inline; }
+
   /* portrait hint */
   #rotate {
     display: none; position: fixed; z-index: 15; left: 50%; top: max(20px, env(safe-area-inset-top));
@@ -168,6 +190,11 @@
   <div id="time">--:--</div>
   <div id="day">&nbsp;</div>
   <div id="date">&nbsp;</div>
+</div>
+
+<div id="battery" aria-label="Battery level">
+  <div class="shell"><div class="fill"></div></div>
+  <span class="pct">--%</span><span class="bolt">⚡</span>
 </div>
 
 <div id="tint"></div>
@@ -547,6 +574,26 @@
       bp.textContent = 'Restored ✓';
     } catch (err) { bp.textContent = 'Restore failed: ' + (err.message || err); }
   };
+
+  /* ================= battery =================
+     Works on Android / computers. iPhone Safari doesn't share battery info with websites,
+     so on iPhone this stays hidden. */
+  if ('getBattery' in navigator) {
+    navigator.getBattery().then(bat => {
+      const el = $('battery');
+      const update = () => {
+        const pct = Math.round(bat.level * 100);
+        el.querySelector('.pct').textContent = pct + '%';
+        el.querySelector('.fill').style.width = pct + '%';
+        el.classList.toggle('charging', bat.charging);
+        el.classList.toggle('low', !bat.charging && pct <= 20);
+        el.classList.add('show');
+      };
+      update();
+      bat.addEventListener('levelchange', update);
+      bat.addEventListener('chargingchange', update);
+    }).catch(() => {});
+  }
 
   /* ================= start ================= */
   buildSwatches();
