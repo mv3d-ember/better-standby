@@ -139,6 +139,9 @@
   #albumInfo { font-size: 14px; opacity: .75; margin-top: 4px; }
   #thumbs { display: flex; gap: 6px; overflow-x: auto; margin-top: 10px; padding-bottom: 4px; }
   #thumbs img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; flex: none; }
+  .note { font-size: 13px; opacity: .7; margin-top: 8px; line-height: 1.35; }
+  #storageStatus { font-size: 14px; margin-bottom: 4px; }
+  #storageStatus.ok { color: #7dff9a; }
   #progress { font-size: 14px; color: var(--accent); margin-top: 8px; min-height: 1em; }
 
   /* portrait hint */
@@ -223,8 +226,20 @@
   </div>
 
   <div class="section">
+    <div class="label"><span>💾 Saving</span></div>
+    <div id="storageStatus">Checking…</div>
+    <div class="note" id="storageNote"></div>
+    <div class="row">
+      <button class="btn secondary" id="backupBtn">Backup</button>
+      <button class="btn secondary" id="restoreBtn">Restore</button>
+    </div>
+    <input type="file" id="restoreInput" accept=".json,application/json" hidden>
+    <div id="backupProgress" class="note"></div>
+  </div>
+
+  <div class="section">
     <button class="btn secondary" id="fullscreenBtn">Keep screen awake</button>
-    <div id="albumInfo" style="margin-top:8px">Tip: in Safari tap Share → “Add to Home Screen” to run it full screen like an app.</div>
+    <div class="note">Tip: in Safari tap Share → “Add to Home Screen” to run it full screen like an app.</div>
   </div>
 </aside>
 
@@ -235,7 +250,8 @@
   /* ================= settings (saved in localStorage) ================= */
   const DEFAULTS = {
     brightness: 100, tint: null, tintStrength: 50,
-    interval: 10, shuffle: true, hour: 12, accent: '#7cc4ff'
+    interval: 10, shuffle: true, hour: 12, accent: '#7cc4ff',
+    customTint: '#ff8800', lastId: null
   };
   let S = { ...DEFAULTS };
   try { Object.assign(S, JSON.parse(localStorage.getItem('standby-settings') || '{}')); } catch (e) {}
@@ -301,7 +317,7 @@
   }
 
   /* ================= slideshow ================= */
-  let urls = [], order = [], pos = 0, timer = null, front = null;
+  let urls = [], ids = [], order = [], pos = 0, timer = null, front = null;
   const slidesEl = $('slides');
   const layers = [document.createElement('div'), document.createElement('div')];
   layers.forEach(l => { l.className = 'slide'; slidesEl.appendChild(l); });
@@ -316,7 +332,9 @@
   function showNext() {
     if (!urls.length) return;
     if (pos >= order.length) makeOrder();
-    const url = urls[order[pos++]];
+    const idx = order[pos++];
+    const url = urls[idx];
+    S.lastId = ids[idx]; save();  // remember which photo was on screen
     const img = new Image();
     img.onload = () => {
       const back = front === layers[0] ? layers[1] : layers[0];
@@ -336,12 +354,17 @@
     let photos = [];
     try { photos = await allPhotos(); } catch (e) {}
     urls = photos.map(p => URL.createObjectURL(p.blob));
+    ids = photos.map(p => p.id);
     document.body.classList.toggle('no-photos', urls.length === 0);
     $('albumInfo').textContent = urls.length ? `${urls.length} photo${urls.length > 1 ? 's' : ''} in album` : 'No photos yet';
     $('thumbs').innerHTML = '';
     urls.slice(0, 40).forEach(u => { const i = new Image(); i.src = u; $('thumbs').appendChild(i); });
     if (!urls.length) { layers.forEach(l => { l.classList.remove('show'); l.style.backgroundImage = ''; }); front = null; }
-    makeOrder(); showNext(); restartTimer();
+    makeOrder();
+    // start on the photo that was showing last time
+    const k = order.indexOf(ids.indexOf(S.lastId));
+    if (k > 0) [order[0], order[k]] = [order[k], order[0]];
+    showNext(); restartTimer();
   }
 
   $('uploadBtn').onclick = () => $('fileInput').click();
@@ -356,6 +379,7 @@
     $('progress').textContent = `Added ${files.length} photo${files.length > 1 ? 's' : ''} ✓`;
     setTimeout(() => $('progress').textContent = '', 3000);
     e.target.value = '';
+    protectStorage();
     loadAlbum();
   };
   $('clearBtn').onclick = async () => {
@@ -377,8 +401,8 @@
     });
     const custom = document.createElement('label');
     custom.className = 'swatch custom'; custom.title = 'Pick any color';
-    custom.innerHTML = '<input type="color" value="#ff8800">';
-    custom.querySelector('input').oninput = e => { S.tint = e.target.value; save(); apply(); };
+    custom.innerHTML = `<input type="color" value="${S.customTint}">`;
+    custom.querySelector('input').oninput = e => { S.tint = S.customTint = e.target.value; save(); apply(); };
     $('swatches').appendChild(custom);
 
     $('accentSwatches').innerHTML = '';
@@ -455,10 +479,80 @@
   document.addEventListener('pointerdown', function first() { keepAwake(); document.removeEventListener('pointerdown', first); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && lock) keepAwake(); });
 
+  /* ================= protected storage ================= */
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  async function protectStorage() {
+    let ok = false;
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        ok = await navigator.storage.persisted() || await navigator.storage.persist();
+      }
+    } catch (e) {}
+    const st = $('storageStatus');
+    if (ok || standalone) {
+      st.textContent = 'Photos & settings are saved on this phone ✓'; st.className = 'ok';
+    } else {
+      st.textContent = 'Saved, but Safari may clear it if unused for a while'; st.className = '';
+    }
+    $('storageNote').textContent = standalone
+      ? 'Running as a Home Screen app, so your stuff is kept safe. Make a backup now and then just in case.'
+      : 'For the safest saving, use “Add to Home Screen” and add your photos there. (Safari tabs and the Home Screen app keep separate albums.)';
+  }
+
+  /* ================= backup / restore ================= */
+  const blobToDataURL = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); });
+  $('backupBtn').onclick = async () => {
+    const bp = $('backupProgress');
+    try {
+      bp.textContent = 'Making backup…';
+      const photos = await allPhotos();
+      const out = { app: 'better-standby', version: 1, settings: S, photos: [] };
+      for (let i = 0; i < photos.length; i++) {
+        bp.textContent = `Packing photo ${i + 1} of ${photos.length}…`;
+        out.photos.push({ added: photos[i].added, data: await blobToDataURL(photos[i].blob) });
+      }
+      const name = `standby-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const file = new File([JSON.stringify(out)], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        bp.textContent = 'Choose “Save to Files” to keep your backup.';
+        await navigator.share({ files: [file], title: 'Standby backup' });
+      } else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(file); a.download = name; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      }
+      bp.textContent = `Backup has ${photos.length} photo${photos.length === 1 ? '' : 's'} + your settings ✓`;
+    } catch (e) {
+      bp.textContent = e && e.name === 'AbortError' ? 'Backup cancelled.' : 'Backup failed: ' + (e.message || e);
+    }
+  };
+  $('restoreBtn').onclick = () => $('restoreInput').click();
+  $('restoreInput').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    const bp = $('backupProgress');
+    try {
+      bp.textContent = 'Reading backup…';
+      const data = JSON.parse(await f.text());
+      if (data.app !== 'better-standby') throw new Error('That file isn’t a Standby backup.');
+      if (!confirm(`Restore ${data.photos.length} photos and your settings? This replaces the current album.`)) { bp.textContent = ''; return; }
+      await clearPhotos();
+      for (let i = 0; i < data.photos.length; i++) {
+        bp.textContent = `Restoring photo ${i + 1} of ${data.photos.length}…`;
+        const blob = await (await fetch(data.photos[i].data)).blob();
+        await req((await store('readwrite')).add({ blob, added: data.photos[i].added || Date.now() }));
+      }
+      S = { ...DEFAULTS, ...data.settings, lastId: null }; save();
+      buildSwatches(); apply(); await loadAlbum(); protectStorage();
+      bp.textContent = 'Restored ✓';
+    } catch (err) { bp.textContent = 'Restore failed: ' + (err.message || err); }
+  };
+
   /* ================= start ================= */
   buildSwatches();
   apply();
   loadAlbum();
+  protectStorage();
 })();
 </script>
 </body>
