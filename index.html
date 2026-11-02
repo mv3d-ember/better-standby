@@ -11,6 +11,9 @@
 <title>Better Standby</title>
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&display=swap">
 <style>
   :root {
     --text: #ffffff;
@@ -34,30 +37,32 @@
     opacity: 0; transition: opacity 1.5s ease;
   }
   .slide.show { opacity: 1; }
-  #slides::after { /* darken behind the clock so text stays readable */
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(90deg, rgba(0,0,0,.65) 0%, rgba(0,0,0,.25) 45%, rgba(0,0,0,0) 70%);
+  #blurBg { /* blurry copy of the photo behind "Fit" mode */
+    position: absolute; inset: -40px; background-size: cover; background-position: center;
+    filter: blur(28px) brightness(.6); display: none; transition: background-image 1.5s;
   }
-  body.no-photos #slides::after { display: none; }
+  body.fit #blurBg { display: block; }
+  body.fit .slide { background-size: contain; background-repeat: no-repeat; }
+  #slides::after { /* darken photos so the text stays readable */
+    content: ""; position: absolute; inset: 0; background: #000; opacity: var(--shade, .3);
+  }
+  body.no-photos #slides::after, body.no-photos #blurBg { display: none; }
 
-  /* ---------- clock ---------- */
-  #clock {
-    position: fixed; z-index: 2;
-    left: max(5vw, env(safe-area-inset-left)); bottom: 9vh;
-    text-shadow: 0 2px 18px rgba(0,0,0,.55);
-    pointer-events: none;
-  }
-  body.no-photos #clock {
-    left: 50%; bottom: 50%; transform: translate(-50%, 50%); text-align: center;
+  /* ---------- widgets (time, day, date, calendar, battery) ----------
+     Each one is placed by the layout settings: left/top in %, size via --s. */
+  .widget {
+    position: fixed; z-index: 2; left: 0; top: 0; white-space: nowrap;
+    text-shadow: 0 2px 18px rgba(0,0,0,.55); pointer-events: none;
+    font-family: var(--font);
   }
   #time {
-    font-size: min(26vw, 48vh); font-weight: 600; line-height: .9;
+    font-size: calc(38vmin * var(--s, 1)); font-weight: var(--weight, 600); line-height: .9;
     letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
   }
   #time .ampm { font-size: .22em; font-weight: 500; letter-spacing: 0; margin-left: .15em; opacity: .85; }
   #time .colon { opacity: .9; }
-  #day  { font-size: min(6vw, 11vh); font-weight: 600; margin-top: 2vh; color: var(--accent); }
-  #date { font-size: min(4.2vw, 7.5vh); font-weight: 400; opacity: .85; margin-top: .4vh; }
+  #day  { font-size: calc(9vmin * var(--s, 1)); font-weight: 600; }
+  #date { font-size: calc(6.5vmin * var(--s, 1)); font-weight: 400; opacity: .9; }
 
   /* ---------- brightness + tint overlays (on top of everything but the menu) ---------- */
   #tint, #dim { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
@@ -146,48 +151,82 @@
 
   /* ---------- battery ---------- */
   #battery {
-    position: fixed; z-index: 3; display: none; align-items: center; gap: 8px;
-    top: max(18px, env(safe-area-inset-top)); left: max(18px, env(safe-area-inset-left));
-    font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums;
-    text-shadow: 0 1px 8px rgba(0,0,0,.6); pointer-events: none;
+    display: flex; align-items: center; gap: .4em;
+    font-size: calc(5vmin * var(--s, 1)); font-weight: 600; font-variant-numeric: tabular-nums;
   }
-  #battery.show { display: flex; }
   #battery .shell {
-    position: relative; width: 38px; height: 19px; border: 2px solid rgba(255,255,255,.85);
-    border-radius: 5px; padding: 2px;
+    position: relative; width: 1.9em; height: .95em; border: .1em solid currentColor;
+    border-radius: .25em; padding: .1em; opacity: .9;
   }
   #battery .shell::after {
-    content: ""; position: absolute; right: -6px; top: 5px; width: 3px; height: 6px;
-    background: rgba(255,255,255,.85); border-radius: 0 2px 2px 0;
+    content: ""; position: absolute; right: -.3em; top: .25em; width: .15em; height: .3em;
+    background: currentColor; border-radius: 0 .1em .1em 0;
   }
-  #battery .fill { height: 100%; border-radius: 2px; background: #fff; transition: width .5s, background .5s; }
+  #battery .fill { height: 100%; border-radius: .1em; background: currentColor; transition: width .5s, background .5s; }
   #battery.charging .fill { background: #4cd964; }
   #battery.low .fill { background: #ff3b30; }
-  #battery .bolt { display: none; font-size: 16px; }
+  #battery .bolt { display: none; font-size: .8em; }
   #battery.charging .bolt { display: inline; }
 
   /* ---------- tomorrow's events card ---------- */
   #cal {
-    position: fixed; z-index: 2; display: none;
-    right: max(18px, env(safe-area-inset-right)); bottom: 9vh;
-    width: min(28vw, 300px); max-height: 76vh; overflow: hidden;
-    padding: 14px 16px; border-radius: 18px;
+    font-size: calc(3.6vmin * var(--s, 1));
+    width: 20em; max-height: 86vh; overflow: hidden;
+    padding: .9em 1.1em; border-radius: 1.2em; white-space: normal; text-align: left;
     background: rgba(0,0,0,.42); border: 1px solid rgba(255,255,255,.12);
     -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-    pointer-events: none;
+    text-shadow: none; color: #fff;
   }
-  body.has-cal #cal { display: block; }
-  #cal h3 { margin: 0 0 8px; font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: .02em; text-transform: uppercase; }
+  #cal h3 { margin: 0 0 .5em; font-size: 1.05em; font-weight: 700; color: var(--head, var(--accent)); letter-spacing: .02em; text-transform: uppercase; }
   #cal h3 small { color: #fff; opacity: .65; font-weight: 500; text-transform: none; letter-spacing: 0; }
-  .ev { display: flex; gap: 9px; padding: 5px 0; border-top: 1px solid rgba(255,255,255,.1); }
+  .ev { display: flex; gap: .6em; padding: .35em 0; border-top: 1px solid rgba(255,255,255,.1); }
   .ev:first-of-type { border-top: 0; }
-  .ev .dot { flex: none; width: 4px; border-radius: 2px; background: var(--accent); }
-  .ev .t { font-size: 13px; opacity: .75; font-variant-numeric: tabular-nums; }
-  .ev .n { font-size: 16px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: calc(min(28vw, 300px) - 50px); }
-  #cal .more, #cal .empty, #cal .err { font-size: 14px; opacity: .7; padding-top: 4px; }
-  /* make room for the card */
-  body.has-cal #time { font-size: min(17vw, 38vh); }
-  body.has-cal.no-photos #clock { left: max(5vw, env(safe-area-inset-left)); bottom: 9vh; transform: none; text-align: left; }
+  .ev .dot { flex: none; width: .28em; border-radius: .14em; background: var(--accent); }
+  .ev > div:last-child { min-width: 0; }
+  .ev .t { font-size: .9em; opacity: .75; font-variant-numeric: tabular-nums; }
+  .ev .n { font-size: 1.12em; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #cal .more, #cal .empty, #cal .err { font-size: .95em; opacity: .7; padding-top: .3em; }
+
+  /* ---------- layout editor ---------- */
+  body.editing .widget {
+    pointer-events: auto; touch-action: none; cursor: grab;
+    outline: 2px dashed rgba(255,255,255,.5); outline-offset: 6px; border-radius: 6px;
+  }
+  body.editing .widget.sel { outline: 2px solid var(--accent); outline-offset: 6px; }
+  body.editing #gear, body.editing #menuBackdrop { display: none; }
+  .guide { position: fixed; z-index: 24; background: var(--accent); display: none; pointer-events: none; opacity: .8; }
+  #guideX { top: 0; bottom: 0; width: 1px; }
+  #guideY { left: 0; right: 0; height: 1px; }
+  #editor {
+    position: fixed; z-index: 30; left: 50%; transform: translateX(-50%);
+    width: min(820px, calc(100vw - 20px)); display: none; transition: opacity .2s;
+    background: var(--panel); border: 1px solid var(--panel-line); border-radius: 18px;
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+    padding: 7px 8px 7px 14px; font-size: 14px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  #editor.top { bottom: auto; top: max(10px, env(safe-area-inset-top)); }
+  body.editing #editor { display: block; }
+  body.dragging #editor { opacity: .15; pointer-events: none; }
+  .erow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .grow { flex: 1; }
+  #edNone .hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #edName { min-width: 64px; }
+  .chip {
+    flex: none; border: 0; border-radius: 999px; padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer;
+    background: rgba(255,255,255,.12); color: #fff;
+  }
+  .chip.primary { background: var(--accent); color: #00182b; }
+  .chip.add { background: rgba(124,196,255,.15); color: var(--accent); }
+  #editor .seg { padding: 2px; }
+  #editor .seg button { padding: 6px 10px; }
+  #editor input[type=range] { flex: 1; min-width: 80px; height: 28px; }
+  #edColors { gap: 5px; flex-wrap: nowrap; }
+  #editor .swatch { width: 24px; height: 24px; flex: none; }
+  #editor .swatch.selected { box-shadow: 0 0 0 2px var(--accent); }
+  @media (max-width: 600px) { #edColors .swatch:nth-child(n+6) { display: none; } #edName { display: none; } }
+  #editor .swatch.acc::after { content: "A"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #00182b; }
+  .hint { opacity: .6; font-size: 13px; }
 
   /* calendar setup in the menu */
   details.steps { margin-top: 10px; background: rgba(255,255,255,.06); border-radius: 12px; padding: 10px 12px; }
@@ -205,48 +244,59 @@
   #calStatus.ok { color: #7dff9a; opacity: 1; }
   #calStatus.bad { color: #ff8a8a; opacity: 1; }
 
-  /* portrait hint */
-  #rotate {
-    display: none; position: fixed; z-index: 15; left: 50%; top: max(20px, env(safe-area-inset-top));
-    transform: translateX(-50%); background: rgba(0,0,0,.6); padding: 8px 14px; border-radius: 20px;
-    font-size: 14px; white-space: nowrap; pointer-events: none;
+  .font-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .font-btns button {
+    border: 1px solid var(--panel-line); background: rgba(255,255,255,.08); color: #fff;
+    border-radius: 10px; padding: 8px 12px; font-size: 16px; cursor: pointer;
   }
-  @media (orientation: portrait) {
-    #rotate { display: block; }
-    #time { font-size: 24vw; }
-    #day  { font-size: 7vw; }
-    #date { font-size: 5vw; }
-    #clock { bottom: 12vh; }
-    #slides::after { background: linear-gradient(0deg, rgba(0,0,0,.7) 0%, rgba(0,0,0,0) 60%); }
-    #cal { top: 70px; bottom: auto; width: calc(100vw - 36px); max-height: 34vh; }
-    .ev .n { max-width: calc(100vw - 100px); }
-    body.has-cal #time { font-size: 24vw; }
-  }
+  .font-btns button.on { border-color: var(--accent); background: rgba(124,196,255,.18); }
 </style>
 </head>
 <body class="no-photos">
 
-<div id="slides"></div>
+<div id="slides"><div id="blurBg"></div></div>
 
-<div id="clock">
-  <div id="time">--:--</div>
-  <div id="day">&nbsp;</div>
-  <div id="date">&nbsp;</div>
-</div>
+<div id="time" class="widget" data-w="time">--:--</div>
+<div id="day" class="widget" data-w="day">&nbsp;</div>
+<div id="date" class="widget" data-w="date">&nbsp;</div>
 
-<div id="battery" aria-label="Battery level">
+<div id="battery" class="widget" data-w="battery" aria-label="Battery level">
   <div class="shell"><div class="fill"></div></div>
   <span class="pct">--%</span><span class="bolt">⚡</span>
 </div>
 
-<div id="cal" aria-label="Tomorrow's events">
+<div id="cal" class="widget" data-w="cal" aria-label="Tomorrow's events">
   <h3>Tomorrow <small id="calDay"></small></h3>
   <div id="calList"></div>
 </div>
 
 <div id="tint"></div>
 <div id="dim"></div>
-<div id="rotate">↻ Turn your phone sideways</div>
+<div id="guideX" class="guide"></div>
+<div id="guideY" class="guide"></div>
+
+<div id="editor">
+  <div class="erow">
+    <span class="erow grow" id="edNone">
+      <b>Edit layout <small id="edOrient" class="hint"></small></b>
+      <span class="hint grow">Drag to move · tap or pinch to change</span>
+      <span id="edHidden" class="erow"></span>
+      <button class="chip" id="edReset">Reset</button>
+    </span>
+    <span class="erow grow" id="edSel" style="display:none">
+      <b id="edName"></b>
+      <input type="range" id="edSize" min="30" max="250" step="1" aria-label="Size">
+      <div class="seg" id="edAlign">
+        <button data-a="left" title="Align left">⇤</button>
+        <button data-a="center" title="Center">↔</button>
+        <button data-a="right" title="Align right">⇥</button>
+      </div>
+      <div class="swatches" id="edColors"></div>
+      <button class="chip" id="edHide">Hide</button>
+    </span>
+    <button class="chip primary" id="edDone">Done</button>
+  </div>
+</div>
 
 <button id="gear" aria-label="Settings">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -265,6 +315,27 @@
   <div class="section">
     <div class="label"><span>☀️ Brightness</span><span id="brightVal">100%</span></div>
     <input type="range" id="brightness" min="5" max="100" step="1" value="100">
+  </div>
+
+  <div class="section">
+    <div class="label"><span>🧩 Layout</span></div>
+    <button class="btn" id="editLayoutBtn">Edit layout (drag &amp; resize)</button>
+    <div class="label" style="margin-top:16px"><span>Font</span></div>
+    <div class="font-btns" id="fontBtns"></div>
+    <div class="label" style="margin-top:16px"><span>Clock thickness</span></div>
+    <div class="seg" id="weightSeg">
+      <button data-v="200">Thin</button>
+      <button data-v="400">Regular</button>
+      <button data-v="600">Bold</button>
+      <button data-v="800">Heavy</button>
+    </div>
+    <div class="label" style="margin-top:16px"><span>Photos</span></div>
+    <div class="seg" id="fitSeg">
+      <button data-v="fill">Fill screen</button>
+      <button data-v="fit">Show whole photo</button>
+    </div>
+    <div class="label" style="margin-top:14px"><span>Photo darkness</span><span id="shadeVal">30%</span></div>
+    <input type="range" id="shade" min="0" max="80" step="1">
   </div>
 
   <div class="section">
@@ -350,7 +421,8 @@
     brightness: 100, tint: null, tintStrength: 50,
     interval: 10, shuffle: true, hour: 12, accent: '#7cc4ff',
     customTint: '#ff8800', lastId: null,
-    calUrl: '', calKey: '', calShow: true
+    calUrl: '', calKey: '', calShow: true,
+    font: 'system', weight: 600, fit: 'fill', shade: 30, layouts: null
   };
   let S = { ...DEFAULTS };
   try { Object.assign(S, JSON.parse(localStorage.getItem('standby-settings') || '{}')); } catch (e) {}
@@ -371,6 +443,68 @@
     { name: 'Pink', c: '#ff4ab4' },
   ];
   const ACCENTS = ['#7cc4ff', '#ffffff', '#ffb347', '#ff6b6b', '#7dff9a', '#c48bff', '#ffe066'];
+
+  /* ================= layout ================= */
+  const FONTS = [
+    { id: 'system',  name: 'Classic', css: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif' },
+    { id: 'rounded', name: 'Rounded', css: 'ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", sans-serif' },
+    { id: 'serif',   name: 'Fancy',   css: 'ui-serif, "New York", Georgia, "Times New Roman", serif' },
+    { id: 'mono',    name: 'Code',    css: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace' },
+    { id: 'narrow',  name: 'Tall',    css: '"Avenir Next Condensed", "Arial Narrow", "Roboto Condensed", sans-serif' },
+    { id: 'pixel',   name: 'Pixel',   css: '"Pixelify Sans", ui-monospace, monospace' },
+  ];
+  const WIDGETS = { time: 'Time', day: 'Day', date: 'Date', cal: 'Calendar', battery: 'Battery' };
+  // x / y = where the widget sits (% of screen). a = which edge x refers to. s = size. c = color.
+  const DEFAULT_LAYOUT = {
+    landscape: {
+      time:    { x: 5,   y: 46, a: 'left',  s: 1,   c: '#ffffff', show: true },
+      day:     { x: 5.4, y: 72, a: 'left',  s: 1,   c: 'accent',  show: true },
+      date:    { x: 5.4, y: 82, a: 'left',  s: 1,   c: '#ffffff', show: true },
+      cal:     { x: 97,  y: 55, a: 'right', s: 1,   c: 'accent',  show: true },
+      battery: { x: 3,   y: 9,  a: 'left',  s: 1,   c: '#ffffff', show: true },
+    },
+    portrait: {
+      time:    { x: 50, y: 27, a: 'center', s: .6, c: '#ffffff', show: true },
+      day:     { x: 50, y: 38, a: 'center', s: 1,  c: 'accent',  show: true },
+      date:    { x: 50, y: 43, a: 'center', s: 1,  c: '#ffffff', show: true },
+      cal:     { x: 50, y: 68, a: 'center', s: 1.1, c: 'accent', show: true },
+      battery: { x: 50, y: 9,  a: 'center', s: 1,  c: '#ffffff', show: true },
+    },
+  };
+  const orient = () => innerHeight > innerWidth ? 'portrait' : 'landscape';
+  function L() { // the layout for the way the phone is turned right now
+    const o = orient();
+    if (!S.layouts || typeof S.layouts !== 'object') S.layouts = {}; // made fresh, never shared with DEFAULTS
+    const cur = S.layouts[o] || (S.layouts[o] = {});
+    for (const k in WIDGETS) cur[k] = { ...DEFAULT_LAYOUT[o][k], ...(cur[k] || {}) };
+    return cur;
+  }
+  let editing = false, batteryOK = false;
+  const calOn = () => !!(S.calShow && S.calUrl);
+  function canShow(k) {
+    if (k === 'battery') return batteryOK;
+    if (k === 'cal') return calOn() || editing;
+    return true;
+  }
+  function applyLayout() {
+    const lay = L();
+    for (const k in WIDGETS) {
+      const el = $(k), w = lay[k];
+      const visible = w.show && canShow(k);
+      el.style.display = visible ? '' : 'none';
+      el.style.left = w.x + '%'; el.style.top = w.y + '%';
+      el.style.transform = `translate(${{ left: '0', center: '-50%', right: '-100%' }[w.a]}, -50%)`;
+      if (k !== 'cal') el.style.textAlign = w.a;
+      el.style.setProperty('--s', w.s);
+      const col = w.c === 'accent' ? 'var(--accent)' : w.c;
+      if (k === 'cal') el.style.setProperty('--head', col); else el.style.color = col;
+    }
+    const f = FONTS.find(f => f.id === S.font) || FONTS[0];
+    document.documentElement.style.setProperty('--font', f.css);
+    document.documentElement.style.setProperty('--weight', S.weight);
+    document.documentElement.style.setProperty('--shade', S.shade / 100);
+    document.body.classList.toggle('fit', S.fit === 'fit');
+  }
 
   /* ================= clock ================= */
   const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -441,6 +575,7 @@
     img.onload = () => {
       const back = front === layers[0] ? layers[1] : layers[0];
       back.style.backgroundImage = `url("${url}")`;
+      $('blurBg').style.backgroundImage = `url("${url}")`;
       back.classList.add('show');
       if (front) front.classList.remove('show');
       front = back;
@@ -524,7 +659,7 @@
     if (S.tint) { t.style.background = S.tint; t.style.opacity = (S.tintStrength / 100).toFixed(2); }
     else t.style.opacity = 0;
     document.documentElement.style.setProperty('--accent', S.accent);
-    applyUI(); tick(); renderCal();
+    applyUI(); tick(); applyLayout(); renderCal();
   }
   function applyUI() {
     $('brightness').value = S.brightness; $('brightVal').textContent = S.brightness + '%';
@@ -541,6 +676,10 @@
     $('calShow').checked = !!S.calShow;
     if (document.activeElement !== $('calUrl')) $('calUrl').value = S.calUrl || '';
     document.querySelectorAll('#hourSeg button').forEach(b => b.classList.toggle('on', +b.dataset.v === S.hour));
+    document.querySelectorAll('#weightSeg button').forEach(b => b.classList.toggle('on', +b.dataset.v === S.weight));
+    document.querySelectorAll('#fitSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === S.fit));
+    document.querySelectorAll('#fontBtns button').forEach(b => b.classList.toggle('on', b.dataset.v === S.font));
+    $('shade').value = S.shade; $('shadeVal').textContent = S.shade + '%';
   }
 
   $('brightness').oninput = e => { S.brightness = +e.target.value; save(); apply(); };
@@ -548,6 +687,15 @@
   $('interval').oninput = e => { S.interval = +e.target.value; save(); applyUI(); };
   $('interval').onchange = restartTimer;
   document.querySelectorAll('#hourSeg button').forEach(b => b.onclick = () => { S.hour = +b.dataset.v; save(); apply(); });
+  document.querySelectorAll('#weightSeg button').forEach(b => b.onclick = () => { S.weight = +b.dataset.v; save(); apply(); });
+  document.querySelectorAll('#fitSeg button').forEach(b => b.onclick = () => { S.fit = b.dataset.v; save(); apply(); });
+  $('shade').oninput = e => { S.shade = +e.target.value; save(); apply(); };
+  FONTS.forEach(f => {
+    const b = document.createElement('button');
+    b.textContent = f.name; b.dataset.v = f.id; b.style.fontFamily = f.css;
+    b.onclick = () => { S.font = f.id; save(); apply(); };
+    $('fontBtns').appendChild(b);
+  });
 
   /* ================= menu open / close + auto-hide gear ================= */
   const openMenu = () => document.body.classList.add('menu-open');
@@ -664,7 +812,7 @@
         el.querySelector('.fill').style.width = pct + '%';
         el.classList.toggle('charging', bat.charging);
         el.classList.toggle('low', !bat.charging && pct <= 20);
-        el.classList.add('show');
+        if (!batteryOK) { batteryOK = true; applyLayout(); }
       };
       update();
       bat.addEventListener('levelchange', update);
@@ -725,12 +873,14 @@
   const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   function renderCal() {
-    const on = !!(S.calShow && S.calUrl);
-    document.body.classList.toggle('has-cal', on);
-    if (!on) return;
+    applyLayout();
     const [tStart] = tomorrowRange();
     $('calDay').textContent = '· ' + DAYS[tStart.getDay()];
     const list = $('calList');
+    if (!calOn()) {
+      if (editing) list.innerHTML = '<div class="empty">Connect Google Calendar in ⚙️ to see events here</div>';
+      return;
+    }
     if (!cal || cal.day !== dayKey(tStart)) {
       list.innerHTML = `<div class="empty">${cal && cal.error ? 'Can’t reach calendar' : 'Loading…'}</div>`;
       return;
@@ -806,6 +956,148 @@
   }, 30 * 1000);
   setInterval(fetchCal, 15 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fetchCal(); });
+
+  /* ================= layout editor ================= */
+  const EDIT_COLORS = ['#ffffff', 'accent', '#7cc4ff', '#ffb347', '#ff6b6b', '#7dff9a', '#c48bff', '#ffe066', '#000000'];
+  let sel = null;
+  EDIT_COLORS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'swatch' + (c === 'accent' ? ' acc' : '');
+    b.dataset.c = c; b.title = c === 'accent' ? 'Accent color' : c;
+    b.style.background = c === 'accent' ? 'var(--accent)' : c;
+    b.onclick = () => { if (!sel) return; L()[sel].c = c; save(); applyLayout(); updateEditor(); };
+    $('edColors').appendChild(b);
+  });
+
+  function updateEditor() {
+    const lay = L();
+    $('edOrient').textContent = `(${orient()})`;
+    // chips to bring back hidden widgets
+    const hid = $('edHidden'); hid.innerHTML = '';
+    for (const k in WIDGETS) {
+      if (lay[k].show || (k === 'battery' && !batteryOK)) continue;
+      const b = document.createElement('button');
+      b.className = 'chip add'; b.textContent = '+ ' + WIDGETS[k];
+      b.onclick = () => { lay[k].show = true; save(); renderCal(); select(k); };
+      hid.appendChild(b);
+    }
+    document.querySelectorAll('.widget').forEach(el => el.classList.toggle('sel', el.dataset.w === sel));
+    $('edSel').style.display = sel ? '' : 'none';
+    $('edNone').style.display = sel ? 'none' : '';
+    if (sel) {
+      const w = lay[sel];
+      $('edName').textContent = WIDGETS[sel];
+      $('edSize').value = Math.round(w.s * 100);
+      document.querySelectorAll('#edAlign button').forEach(b => b.classList.toggle('on', b.dataset.a === w.a));
+      document.querySelectorAll('#edColors .swatch').forEach(b => b.classList.toggle('selected', b.dataset.c === w.c));
+    }
+    placeEditor();
+  }
+  // put the editor at the top or bottom, wherever it covers fewer widgets
+  function placeEditor() {
+    const ed = $('editor'), rects = [];
+    document.querySelectorAll('.widget').forEach(el => { if (el.offsetParent !== null || el.style.display !== 'none') rects.push(el.getBoundingClientRect()); });
+    const overlap = () => {
+      const e = ed.getBoundingClientRect(); let a = 0;
+      for (const r of rects) a += Math.max(0, Math.min(e.right, r.right) - Math.max(e.left, r.left)) * Math.max(0, Math.min(e.bottom, r.bottom) - Math.max(e.top, r.top));
+      return a;
+    };
+    ed.classList.remove('top'); const bottom = overlap();
+    ed.classList.add('top'); const top = overlap();
+    ed.classList.toggle('top', top < bottom);
+  }
+  function select(k) { sel = k; updateEditor(); }
+
+  function startEditing() {
+    editing = true; document.body.classList.add('editing'); closeMenu();
+    sel = null; renderCal(); updateEditor();
+  }
+  function stopEditing() {
+    editing = false; sel = null; document.body.classList.remove('editing');
+    $('editor').classList.remove('top'); save(); renderCal(); updateEditor();
+  }
+  $('editLayoutBtn').onclick = startEditing;
+  $('edDone').onclick = stopEditing;
+  $('edReset').onclick = () => {
+    if (!confirm(`Reset the ${orient()} layout back to normal?`)) return;
+    delete S.layouts[orient()]; save(); sel = null; renderCal(); updateEditor();
+  };
+  $('edHide').onclick = () => { if (!sel) return; L()[sel].show = false; sel = null; save(); renderCal(); updateEditor(); };
+  $('edSize').oninput = e => { if (!sel) return; L()[sel].s = e.target.value / 100; applyLayout(); if (sel === 'cal') renderCal(); };
+  $('edSize').onchange = save;
+  document.querySelectorAll('#edAlign button').forEach(b => b.onclick = () => {
+    if (!sel) return;
+    const w = L()[sel], r = $(sel).getBoundingClientRect(), a = b.dataset.a;
+    // keep it in the same spot on screen, just change which edge it lines up from
+    const px = a === 'left' ? r.left : a === 'right' ? r.right : r.left + r.width / 2;
+    w.x = +(px / innerWidth * 100).toFixed(2); w.a = a;
+    save(); applyLayout(); updateEditor();
+  });
+
+  // ----- drag to move, pinch to resize -----
+  const pointers = new Map();
+  let gesture = null;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const dist = () => { const [p, q] = [...pointers.values()]; return Math.hypot(p.x - q.x, p.y - q.y); };
+
+  document.querySelectorAll('.widget').forEach(el => el.addEventListener('pointerdown', e => {
+    if (!editing) return;
+    e.preventDefault(); e.stopPropagation();
+    const k = el.dataset.w; select(k);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const w = L()[k];
+    if (pointers.size === 1) { gesture = { k, mode: 'drag', sx: e.clientX, sy: e.clientY, x0: w.x, y0: w.y }; document.body.classList.add('dragging'); }
+    else if (gesture) Object.assign(gesture, { mode: 'pinch', d0: dist(), s0: w.s });
+  }));
+  document.addEventListener('pointerdown', e => {
+    if (!editing) return;
+    if (gesture && !pointers.has(e.pointerId) && pointers.size === 1 && !e.target.closest('#editor')) {
+      // second finger landed next to the widget: start pinching
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      Object.assign(gesture, { mode: 'pinch', d0: dist(), s0: L()[gesture.k].s });
+    } else if (!e.target.closest('.widget, #editor')) select(null);
+  });
+  document.addEventListener('pointermove', e => {
+    if (!editing || !gesture || !pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const lay = L(), w = lay[gesture.k];
+    if (gesture.mode === 'pinch' && pointers.size >= 2) {
+      w.s = +clamp(gesture.s0 * dist() / gesture.d0, .3, 2.5).toFixed(2);
+      $('edSize').value = Math.round(w.s * 100);
+      applyLayout(); if (gesture.k === 'cal') renderCal();
+      return;
+    }
+    if (gesture.mode !== 'drag') return;
+    let x = clamp(gesture.x0 + (e.clientX - gesture.sx) / innerWidth * 100, 0, 100);
+    let y = clamp(gesture.y0 + (e.clientY - gesture.sy) / innerHeight * 100, 0, 100);
+    // snap to the middle of the screen, or to line up with other widgets
+    const T = 1.2; let gx = null, gy = null;
+    const xs = [50], ys = [50];
+    for (const k in lay) if (k !== gesture.k && lay[k].show && canShow(k)) {
+      if (lay[k].a === w.a) xs.push(lay[k].x);
+      ys.push(lay[k].y);
+    }
+    for (const v of xs) if (Math.abs(x - v) < T) { x = v; gx = v; break; }
+    for (const v of ys) if (Math.abs(y - v) < T) { y = v; gy = v; break; }
+    w.x = +x.toFixed(2); w.y = +y.toFixed(2);
+    $('guideX').style.display = gx === null ? 'none' : 'block'; $('guideX').style.left = gx + '%';
+    $('guideY').style.display = gy === null ? 'none' : 'block'; $('guideY').style.top = gy + '%';
+    applyLayout();
+  });
+  const endPointer = e => {
+    if (!pointers.delete(e.pointerId)) return;
+    if (pointers.size === 0 && gesture) {
+      gesture = null; document.body.classList.remove('dragging'); save(); updateEditor();
+      $('guideX').style.display = $('guideY').style.display = 'none';
+    } else if (gesture && pointers.size === 1) {
+      // went from 2 fingers back to 1: keep dragging from here
+      const [p] = pointers.values(), w = L()[gesture.k];
+      Object.assign(gesture, { mode: 'drag', sx: p.x, sy: p.y, x0: w.x, y0: w.y });
+    }
+  };
+  document.addEventListener('pointerup', endPointer);
+  document.addEventListener('pointercancel', endPointer);
+  addEventListener('resize', () => { if (editing) { sel = null; updateEditor(); } });
 
   /* ================= start ================= */
   buildSwatches();
