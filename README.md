@@ -1,0 +1,11 @@
+# Better Standby
+
+A StandBy-style clock for your iPhone in landscape: big time, day of the week, date, and a photo slideshow behind it.
+
+Tap the screen to show the ⚙️ gear (it hides after 5 seconds). The menu has:
+- **Brightness**: dims the screen more than iOS lets you
+- **Color tint**: preset colors (Night red is easy on your eyes in the dark), a custom color picker, and a strength slider
+- **Photo album**: upload photos, choose how often they change, shuffle, clear
+- 12/24-hour clock and accent color
+
+Photos and settings stay saved on your phone, inside the browser. Nothing gets uploaded anywhere.
