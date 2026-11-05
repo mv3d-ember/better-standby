@@ -6,7 +6,7 @@ Tap the screen to show the ⚙️ gear (it hides after 5 seconds). The menu has:
 - **Layout**: tap **Edit layout** to drag the time, day, date, calendar and battery anywhere, pinch (or use the slider) to resize, and change alignment, color or hide each one. Landscape and portrait each keep their own layout. You can also pick a font (Classic, Rounded, Fancy, Code, Tall, Pixel), clock thickness, Fill/Fit photos and photo darkness.
 - **Brightness**: dims the screen more than iOS lets you
 - **Color tint**: preset colors (Night red is easy on your eyes in the dark), a custom color picker, and a strength slider
-- **Photo album**: upload photos, choose how often they change, shuffle, clear
+- **Photo album**: upload photos, tap thumbnails to pick ones to remove, choose how often they change, shuffle, clear all
 - 12/24-hour clock and accent color
 
 A battery level display shows in the top-left on Android phones and computers. iPhone Safari doesn't let websites read the battery, so it hides itself there.

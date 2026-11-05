@@ -142,8 +142,23 @@
   .seg button.on { background: rgba(255,255,255,.22); font-weight: 600; }
 
   #albumInfo { font-size: 14px; opacity: .75; margin-top: 4px; }
-  #thumbs { display: flex; gap: 6px; overflow-x: auto; margin-top: 10px; padding-bottom: 4px; }
-  #thumbs img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; flex: none; }
+  #thumbs {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px;
+    max-height: 200px; overflow-y: auto; margin-top: 10px; -webkit-overflow-scrolling: touch;
+  }
+  #thumbs:empty { display: none; }
+  .thumb {
+    position: relative; aspect-ratio: 1; border: 0; padding: 0; border-radius: 8px; overflow: hidden;
+    background: #222 center/cover no-repeat; cursor: pointer;
+  }
+  .thumb.picked { outline: 3px solid #ff5a5a; outline-offset: -3px; }
+  .thumb.picked::after {
+    content: "✕"; position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%;
+    background: #ff3b30; color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center;
+  }
+  .thumb.picked::before { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.35); }
+  #removeBtn { display: none; }
+  #removeBtn.show { display: block; }
   .note { font-size: 13px; opacity: .7; margin-top: 8px; line-height: 1.35; }
   #storageStatus { font-size: 14px; margin-bottom: 4px; }
   #storageStatus.ok { color: #7dff9a; }
@@ -349,6 +364,8 @@
     <div class="label"><span>🖼️ Photo album</span></div>
     <div id="albumInfo">No photos yet</div>
     <div id="thumbs"></div>
+    <div class="note" id="thumbHint" style="display:none">Tap photos to pick the ones you want to remove.</div>
+    <button class="btn danger" id="removeBtn">Remove selected</button>
     <input type="file" id="fileInput" accept="image/*" multiple hidden>
     <button class="btn" id="uploadBtn">Upload photos</button>
     <div id="progress"></div>
@@ -537,6 +554,7 @@
   const req = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
   async function addPhoto(blob) { return req((await store('readwrite')).add({ blob, added: Date.now() })); }
   async function allPhotos() { return req((await store('readonly')).getAll()); }
+  async function deletePhotos(list) { const st = await store('readwrite'); for (const id of list) await req(st.delete(id)); }
   async function clearPhotos() { return req((await store('readwrite')).clear()); }
 
   // Shrink big iPhone photos so they load fast and don't fill up storage
@@ -594,8 +612,21 @@
     ids = photos.map(p => p.id);
     document.body.classList.toggle('no-photos', urls.length === 0);
     $('albumInfo').textContent = urls.length ? `${urls.length} photo${urls.length > 1 ? 's' : ''} in album` : 'No photos yet';
+    // thumbnails: tap to pick photos to remove
+    picked.clear(); updateRemoveBtn();
     $('thumbs').innerHTML = '';
-    urls.slice(0, 40).forEach(u => { const i = new Image(); i.src = u; $('thumbs').appendChild(i); });
+    $('thumbHint').style.display = urls.length ? '' : 'none';
+    urls.forEach((u, i) => {
+      const b = document.createElement('button');
+      b.className = 'thumb'; b.style.backgroundImage = `url("${u}")`; b.setAttribute('aria-label', 'Photo ' + (i + 1));
+      b.onclick = () => {
+        const id = ids[i];
+        picked.has(id) ? picked.delete(id) : picked.add(id);
+        b.classList.toggle('picked', picked.has(id));
+        updateRemoveBtn();
+      };
+      $('thumbs').appendChild(b);
+    });
     if (!urls.length) { layers.forEach(l => { l.classList.remove('show'); l.style.backgroundImage = ''; }); front = null; }
     makeOrder();
     // start on the photo that was showing last time
@@ -617,6 +648,18 @@
     setTimeout(() => $('progress').textContent = '', 3000);
     e.target.value = '';
     protectStorage();
+    loadAlbum();
+  };
+  const picked = new Set();
+  function updateRemoveBtn() {
+    $('removeBtn').classList.toggle('show', picked.size > 0);
+    $('removeBtn').textContent = `Remove ${picked.size} selected photo${picked.size === 1 ? '' : 's'}`;
+  }
+  $('removeBtn').onclick = async () => {
+    if (!picked.size) return;
+    await deletePhotos([...picked]);
+    $('progress').textContent = `Removed ${picked.size} photo${picked.size === 1 ? '' : 's'} ✓`;
+    setTimeout(() => $('progress').textContent = '', 3000);
     loadAlbum();
   };
   $('clearBtn').onclick = async () => {
